@@ -1,0 +1,18 @@
+{
+"short_name": "QuestLog",
+"name": "QuestLog - Study RPG",
+"icons": [
+{
+"src": "icona-libro.png",
+"sizes": "512x512",
+"type": "image/png",
+"purpose": "any maskable"
+}
+],
+"start_url": "./index.html",
+"background_color": "#0f172a",
+"theme_color": "#6366f1",
+"display": "standalone",
+"orientation": "portrait",
+"description": "Gestisci i tuoi compiti e lo studio come un vero gioco di ruolo RPG!"
+}
