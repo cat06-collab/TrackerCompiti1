@@ -97,6 +97,13 @@
       border: 1px solid var(--border-color);
     }
 
+    /* Boss Card Styling */
+    .boss-card {
+      background: linear-gradient(145deg, var(--bg-card) 0%, rgba(159, 18, 57, 0.22) 100%);
+      border: 1px solid rgba(244, 63, 94, 0.55);
+      box-shadow: 0 10px 25px -5px rgba(225, 29, 72, 0.15);
+    }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -121,12 +128,41 @@
       pointer-events: none;
       z-index: 999;
     }
+
+    @keyframes bossHit {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .boss-hit-anim {
+      animation: bossHit 0.25s ease-in-out;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans antialiased pb-20 md:pb-6 select-none">
 
   <!-- Particle Canvas Effect -->
   <canvas id="fx-canvas"></canvas>
+
+  <!-- Custom Toast Notification Banner (Replaces native alerts) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[1000] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Custom Confirm Modal (Replaces native confirm) -->
+  <div id="modal-confirm" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-[998]">
+    <div class="glass-panel w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl border border-theme-border">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 id="confirm-title" class="font-bold text-base">Conferma azione</h3>
+      </div>
+      <p id="confirm-message" class="text-xs text-theme-muted leading-relaxed"></p>
+      <div class="flex gap-2 pt-2">
+        <button id="confirm-cancel-btn" class="flex-1 py-2.5 rounded-xl glass-panel text-xs font-semibold hover:bg-theme-border transition">Annulla</button>
+        <button id="confirm-ok-btn" class="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-lg transition">Conferma</button>
+      </div>
+    </div>
+  </div>
 
   <!-- APP CONTAINER -->
   <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4 flex-1 flex flex-col gap-6">
@@ -138,7 +174,7 @@
       <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
         
         <div class="flex items-center gap-4 w-full md:w-auto">
-          <div class="relative group cursor-pointer" onclick="openProfileCustomizer()" title="Personalizza Profilo">
+          <div class="relative group cursor-pointer" onclick="openProfileCustomizer()" title="Personalizza Profilo e Classe RPG">
             <div id="char-avatar" class="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-4xl text-white shadow-xl transform group-hover:scale-105 transition">
               🧙‍♂️
             </div>
@@ -150,10 +186,13 @@
           <div class="flex-1 space-y-1">
             <div class="flex items-center gap-3">
               <div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                   <h1 id="char-name" class="text-xl md:text-2xl font-black tracking-tight cursor-pointer hover:underline" onclick="openProfileCustomizer()">Hero Student</h1>
                   <span class="text-xs px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30">
                     Lvl <span id="char-level">1</span>
+                  </span>
+                  <span id="char-passive-pill" onclick="openProfileCustomizer()" class="cursor-pointer text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 hover:bg-emerald-500/25 transition" title="Clicca per cambiare classe">
+                    <i class="fa-solid fa-sparkles"></i> <span id="char-passive-short">+15% XP Difficile</span>
                   </span>
                 </div>
                 <p id="char-title" class="text-xs text-amber-400 font-semibold italic">Studioso Leggendario</p>
@@ -185,12 +224,17 @@
             </div>
           </div>
 
-          <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3 shadow-inner">
+          <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3 shadow-inner relative">
             <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-xl">
               <i class="fa-solid fa-fire"></i>
             </div>
             <div>
-              <p class="text-[10px] uppercase font-bold text-theme-muted tracking-wider">Streak</p>
+              <p class="text-[10px] uppercase font-bold text-theme-muted tracking-wider flex items-center gap-1">
+                Streak
+                <span id="warrior-shield-badge" class="hidden text-[9px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 border border-sky-500/40" title="Abilità Guerriero: Protezione Streak settimanale">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </span>
+              </p>
               <p class="text-lg font-black text-rose-400"><span id="char-streak">0</span> <span class="text-xs font-normal">gg</span></p>
             </div>
           </div>
@@ -213,22 +257,22 @@
 
     <!-- NAVIGATION TABS -->
     <nav class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-theme-border">
-      <button onclick="switchTab('quests')" id="tab-btn-quests" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition bg-theme-accent text-white shadow-lg shadow-indigo-500/20">
+      <button onclick="switchTab('quests')" id="tab-btn-quests" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition bg-theme-accent text-white shadow-lg shadow-indigo-500/20 whitespace-nowrap">
         <i class="fa-solid fa-scroll"></i> Quest Log
       </button>
-      <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border">
+      <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap">
         <i class="fa-solid fa-chart-pie"></i> Statistiche
       </button>
-      <button onclick="switchTab('shop')" id="tab-btn-shop" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border">
+      <button onclick="switchTab('shop')" id="tab-btn-shop" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap">
         <i class="fa-solid fa-store"></i> Shop Premi
       </button>
-      <button onclick="switchTab('subjects')" id="tab-btn-subjects" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border">
+      <button onclick="switchTab('subjects')" id="tab-btn-subjects" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap">
         <i class="fa-solid fa-book-bookmark"></i> Materie
       </button>
-      <button onclick="switchTab('trophies')" id="tab-btn-trophies" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border">
+      <button onclick="switchTab('trophies')" id="tab-btn-trophies" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap">
         <i class="fa-solid fa-trophy"></i> Trofei
       </button>
-      <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border">
+      <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap">
         <i class="fa-solid fa-sliders"></i> Bilanciamento
       </button>
     </nav>
@@ -239,9 +283,14 @@
       <!-- TAB 1: QUEST LOG -->
       <section id="tab-quests" class="space-y-6">
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <button onclick="openNewQuestModal()" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition transform active:scale-95">
-            <i class="fa-solid fa-plus-circle text-lg"></i> Nuova Quest
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="openNewQuestModal(false)" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition transform active:scale-95">
+              <i class="fa-solid fa-plus-circle text-lg"></i> Nuova Quest
+            </button>
+            <button onclick="openNewQuestModal(true)" class="px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white font-bold text-sm shadow-xl shadow-rose-500/20 flex items-center justify-center gap-2 transition transform active:scale-95">
+              <i class="fa-solid fa-dragon text-base"></i> Nuova Boss Fight
+            </button>
+          </div>
 
           <div class="flex flex-wrap items-center gap-2">
             <select id="filter-subject" onchange="renderQuests()" class="glass-panel px-3 py-2 rounded-xl text-xs font-semibold text-theme-text outline-none border border-theme-border">
@@ -249,6 +298,7 @@
             </select>
             <select id="filter-status" onchange="renderQuests()" class="glass-panel px-3 py-2 rounded-xl text-xs font-semibold text-theme-text outline-none border border-theme-border">
               <option value="ACTIVE">In Corso</option>
+              <option value="BOSS">🐉 Solo Boss Fight</option>
               <option value="EXPIRED">⚠️ Scadute</option>
               <option value="COMPLETED">Completate</option>
               <option value="ALL">Tutte</option>
@@ -267,13 +317,16 @@
 
       <!-- TAB 2: ANALYTICS & STATS -->
       <section id="tab-analytics" class="space-y-6 hidden">
-        <div>
-          <h2 class="text-xl font-extrabold flex items-center gap-2">
-            <i class="fa-solid fa-chart-pie text-indigo-400"></i> Analytics & Report di Studio
-          </h2>
-          <p class="text-xs text-theme-muted">Monitora le tue prestazioni, la puntualità e la produttività nelle materie.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-xl font-extrabold flex items-center gap-2">
+              <i class="fa-solid fa-chart-pie text-indigo-400"></i> Analytics & Report di Studio
+            </h2>
+            <p class="text-xs text-theme-muted">Monitora le tue prestazioni settimanali, mensili, i Boss sconfitti e l'analisi approfondita delle materie.</p>
+          </div>
         </div>
 
+        <!-- KPI PRINCIPALI (Esistenti) -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="glass-panel p-4 rounded-2xl border border-theme-border flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
@@ -316,6 +369,50 @@
           </div>
         </div>
 
+        <!-- NUOVI KPI AVANZATI DI MONITORAGGIO -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="glass-panel p-4 rounded-2xl border border-rose-500/30 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-dragon"></i>
+            </div>
+            <div>
+              <p class="text-[10px] font-bold text-theme-muted uppercase">Boss Sconfitti</p>
+              <p id="kpi-boss-defeated" class="text-lg font-black text-rose-400">0</p>
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl border border-theme-border flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-list-check"></i>
+            </div>
+            <div>
+              <p class="text-[10px] font-bold text-theme-muted uppercase">Step Completati</p>
+              <p id="kpi-subtasks-done" class="text-lg font-black text-teal-400">0</p>
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl border border-theme-border flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-crown"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[10px] font-bold text-theme-muted uppercase">Materia Top</p>
+              <p id="kpi-top-subject" class="text-sm font-black truncate">-</p>
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl border border-theme-border flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-gauge-high"></i>
+            </div>
+            <div>
+              <p class="text-[10px] font-bold text-theme-muted uppercase">Tasso Completamento</p>
+              <p id="kpi-completion-rate" class="text-lg font-black text-purple-400">0%</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRAFICI SETTIMANALI & MATERIE (Esistenti) -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="glass-panel p-5 rounded-3xl border border-theme-border space-y-3">
             <h3 class="text-sm font-bold flex items-center gap-2">
@@ -335,18 +432,61 @@
             </div>
           </div>
         </div>
+
+        <!-- NUOVO GRAFICO A BARRE SU SCALA MENSILE -->
+        <div class="glass-panel p-5 rounded-3xl border border-theme-border space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold flex items-center gap-2">
+                <i class="fa-solid fa-calendar-days text-emerald-400"></i> Andamento Mensile (Scala 30 Giorni / Mesi)
+              </h3>
+              <p class="text-[11px] text-theme-muted">Visualizza la costanza dello studio giorno per giorno nell'ultimo mese o il riepilogo degli ultimi 6 mesi.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="setMonthlyChartMode('30days')" id="btn-chart-30days" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500 text-white transition">Ultimi 30 Giorni</button>
+              <button onclick="setMonthlyChartMode('6months')" id="btn-chart-6months" class="px-3 py-1.5 rounded-xl text-xs font-bold glass-panel text-theme-muted hover:text-theme-text transition">Ultimi 6 Mesi</button>
+            </div>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="chart-monthly"></canvas>
+          </div>
+        </div>
+
+        <!-- ANALISI DETTAGLIATA PER DIFFICOLTÀ E MATERIA -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-panel p-5 rounded-3xl border border-theme-border space-y-4">
+            <h3 class="text-sm font-bold flex items-center gap-2">
+              <i class="fa-solid fa-layer-group text-amber-400"></i> Analisi per Livello di Difficoltà
+            </h3>
+            <div id="analytics-difficulty-breakdown" class="space-y-3">
+              <!-- Popolato via JS -->
+            </div>
+          </div>
+
+          <div class="glass-panel p-5 rounded-3xl border border-theme-border space-y-4">
+            <h3 class="text-sm font-bold flex items-center gap-2">
+              <i class="fa-solid fa-magnifying-glass-chart text-cyan-400"></i> Rendimento Dettagliato per Materia
+            </h3>
+            <div id="analytics-subject-table" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <!-- Popolato via JS -->
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 3: SHOP PREMI -->
       <section id="tab-shop" class="space-y-6 hidden">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 class="text-xl font-extrabold flex items-center gap-2">
               <i class="fa-solid fa-store text-amber-400"></i> Shop dei Premi
+              <span id="shop-bard-badge" class="hidden text-xs px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/40 font-bold">
+                🎨 Sconto Bardo -10% Attivo!
+              </span>
             </h2>
             <p class="text-xs text-theme-muted">Spendi le tue monete guadagnate con i compiti per riscattare i tuoi premi reali!</p>
           </div>
-          <button onclick="openNewRewardModal()" class="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs shadow-lg flex items-center gap-2 transition">
+          <button onclick="openNewRewardModal()" class="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs shadow-lg flex items-center gap-2 transition self-start sm:self-auto">
             <i class="fa-solid fa-plus-circle"></i> Nuovo Premio
           </button>
         </div>
@@ -468,17 +608,34 @@
     </main>
   </div>
 
-  <!-- MODAL: NUOVA QUEST -->
-  <div id="modal-quest" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="glass-panel w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-theme-border">
+  <!-- MODAL: NUOVA QUEST / BOSS FIGHT -->
+  <div id="modal-quest" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl border border-theme-border my-auto">
       <div class="flex justify-between items-center">
-        <h3 class="font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-scroll text-emerald-400"></i> Nuova Quest</h3>
+        <h3 id="modal-quest-heading" class="font-bold text-lg flex items-center gap-2">
+          <i class="fa-solid fa-scroll text-emerald-400"></i> Nuova Quest
+        </h3>
         <button onclick="closeModal('modal-quest')" class="text-theme-muted hover:text-theme-text"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- Toggle Boss Fight -->
+      <div class="p-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🐉</span>
+          <div>
+            <p class="text-xs font-extrabold text-rose-400">Modalità Boss Fight (Verifica / Esame)</p>
+            <p class="text-[10px] text-theme-muted">Barra HP da abbattere con i sotto-obiettivi + Loot 2X alla sconfitta!</p>
+          </div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="quest-is-boss" onchange="toggleBossModalUI()" class="sr-only peer">
+          <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+        </label>
       </div>
 
       <div class="space-y-3">
         <div>
-          <label class="block text-xs font-semibold text-theme-muted mb-1">Titolo Compito / Quest</label>
+          <label id="quest-title-label" class="block text-xs font-semibold text-theme-muted mb-1">Titolo Compito / Quest</label>
           <input type="text" id="quest-title" placeholder="Es. Espressioni di Matematica, Pagina 45" class="w-full glass-panel px-3 py-2.5 rounded-xl text-sm outline-none border border-theme-border">
         </div>
 
@@ -500,7 +657,7 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-theme-muted mb-1">Data Scadenza</label>
+            <label id="quest-date-label" class="block text-xs font-semibold text-theme-muted mb-1">Data Scadenza</label>
             <input type="date" id="quest-date" class="w-full glass-panel px-3 py-2.5 rounded-xl text-sm outline-none border border-theme-border">
           </div>
           <div>
@@ -509,24 +666,45 @@
           </div>
         </div>
 
+        <!-- SUB-QUEST / CHECKLIST BUILDER -->
+        <div class="space-y-2 pt-1">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-theme-muted">
+              <i class="fa-solid fa-list-check text-indigo-400"></i> Sub-Quest / Passaggi (Checklist)
+            </label>
+            <button type="button" onclick="addSuggestedBossSubtasks()" id="btn-suggest-boss-steps" class="hidden text-[10px] font-bold text-rose-400 hover:underline">
+              + Suggerisci step esame
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" id="new-subtask-input" placeholder="Es. Ripasso Cap. 1, Schemi, Esercizi..." onkeydown="if(event.key==='Enter'){event.preventDefault(); addDraftSubtask();}" class="flex-1 glass-panel px-3 py-2 rounded-xl text-xs outline-none border border-theme-border">
+            <button type="button" onclick="addDraftSubtask()" class="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold transition">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+          </div>
+          <div id="draft-subtasks-list" class="space-y-1.5 max-h-28 overflow-y-auto">
+            <!-- Subtasks aggiunte -->
+          </div>
+        </div>
+
         <div>
           <label class="block text-xs font-semibold text-theme-muted mb-1">Note Aggiuntive</label>
-          <textarea id="quest-notes" rows="2" placeholder="Dettagli, capitoli da studiare..." class="w-full glass-panel px-3 py-2.5 rounded-xl text-sm outline-none border border-theme-border resize-none"></textarea>
+          <textarea id="quest-notes" rows="2" placeholder="Dettagli, capitoli da studiare..." class="w-full glass-panel px-3 py-2 rounded-xl text-sm outline-none border border-theme-border resize-none"></textarea>
         </div>
       </div>
 
       <div class="flex gap-2 pt-2">
         <button onclick="closeModal('modal-quest')" class="flex-1 py-2.5 rounded-xl glass-panel text-xs font-semibold">Annulla</button>
-        <button onclick="saveQuest()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-lg">Crea Quest</button>
+        <button id="btn-save-quest" onclick="saveQuest()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-lg">Crea Quest</button>
       </div>
     </div>
   </div>
 
   <!-- MODAL: CLASSE PERSONAGGIO E PROFILO CUSTOM -->
-  <div id="modal-profile" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="glass-panel w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-theme-border">
+  <div id="modal-profile" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl border border-theme-border my-auto">
       <div class="flex justify-between items-center">
-        <h3 class="font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-user-gear text-indigo-400"></i> Personalizza Profilo</h3>
+        <h3 class="font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-user-gear text-indigo-400"></i> Personalizza Profilo & Classe</h3>
         <button onclick="closeModal('modal-profile')" class="text-theme-muted hover:text-theme-text"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
@@ -553,12 +731,36 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-theme-muted mb-1">Classe RPG Preset</label>
-          <div class="grid grid-cols-4 gap-2">
-            <button onclick="selectClassPreset('Mago', '🧙‍♂️')" class="p-2 glass-panel rounded-xl text-center hover:border-indigo-500 transition text-xs">🧙‍♂️ Mago</button>
-            <button onclick="selectClassPreset('Guerriero', '⚔️')" class="p-2 glass-panel rounded-xl text-center hover:border-indigo-500 transition text-xs">⚔️ Guerriero</button>
-            <button onclick="selectClassPreset('Canaglia', '🗡️')" class="p-2 glass-panel rounded-xl text-center hover:border-indigo-500 transition text-xs">🗡️ Canaglia</button>
-            <button onclick="selectClassPreset('Bardo', '🎨')" class="p-2 glass-panel rounded-xl text-center hover:border-indigo-500 transition text-xs">🎨 Bardo</button>
+          <label class="block text-xs font-semibold text-theme-muted mb-1.5">Scegli Classe RPG (Bonus Passivo Reale)</label>
+          <input type="hidden" id="custom-class-name" value="Mago">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button type="button" id="class-card-Mago" onclick="selectClassPreset('Mago', '🧙‍♂️')" class="class-preset-btn p-2.5 glass-panel rounded-xl text-left border border-theme-border hover:border-indigo-500 transition">
+              <div class="flex items-center gap-2 font-bold text-xs">
+                <span class="text-lg">🧙‍♂️</span> Mago
+              </div>
+              <p class="text-[10px] text-purple-400 font-semibold mt-0.5">+15% XP sulle quest Difficili</p>
+            </button>
+
+            <button type="button" id="class-card-Canaglia" onclick="selectClassPreset('Canaglia', '🗡️')" class="class-preset-btn p-2.5 glass-panel rounded-xl text-left border border-theme-border hover:border-indigo-500 transition">
+              <div class="flex items-center gap-2 font-bold text-xs">
+                <span class="text-lg">🗡️</span> Canaglia
+              </div>
+              <p class="text-[10px] text-amber-400 font-semibold mt-0.5">+20% Monete se finisci ≥24h prima</p>
+            </button>
+
+            <button type="button" id="class-card-Guerriero" onclick="selectClassPreset('Guerriero', '⚔️')" class="class-preset-btn p-2.5 glass-panel rounded-xl text-left border border-theme-border hover:border-indigo-500 transition">
+              <div class="flex items-center gap-2 font-bold text-xs">
+                <span class="text-lg">⚔️</span> Guerriero
+              </div>
+              <p class="text-[10px] text-sky-400 font-semibold mt-0.5">Scudo Streak (salva 1 giorno/sett.)</p>
+            </button>
+
+            <button type="button" id="class-card-Bardo" onclick="selectClassPreset('Bardo', '🎨')" class="class-preset-btn p-2.5 glass-panel rounded-xl text-left border border-theme-border hover:border-indigo-500 transition">
+              <div class="flex items-center gap-2 font-bold text-xs">
+                <span class="text-lg">🎨</span> Bardo
+              </div>
+              <p class="text-[10px] text-pink-400 font-semibold mt-0.5">Sconto 10% su tutti i premi Shop</p>
+            </button>
           </div>
         </div>
 
@@ -593,22 +795,22 @@
         <div onclick="selectClass('Mago', '🧙‍♂️')" class="glass-panel p-4 rounded-2xl cursor-pointer hover:border-indigo-500 text-center space-y-1 transition">
           <div class="text-4xl">🧙‍♂️</div>
           <div class="font-bold text-sm">Mago</div>
-          <p class="text-[10px] text-theme-muted">Master della Teoria</p>
+          <p class="text-[10px] text-purple-400 font-semibold">+15% XP quest Difficili</p>
         </div>
         <div onclick="selectClass('Guerriero', '⚔️')" class="glass-panel p-4 rounded-2xl cursor-pointer hover:border-indigo-500 text-center space-y-1 transition">
           <div class="text-4xl">⚔️</div>
           <div class="font-bold text-sm">Guerriero</div>
-          <p class="text-[10px] text-theme-muted">Instancabile</p>
+          <p class="text-[10px] text-sky-400 font-semibold">Protezione Streak 1x/sett</p>
         </div>
         <div onclick="selectClass('Canaglia', '🗡️')" class="glass-panel p-4 rounded-2xl cursor-pointer hover:border-indigo-500 text-center space-y-1 transition">
           <div class="text-4xl">🗡️</div>
           <div class="font-bold text-sm">Canaglia</div>
-          <p class="text-[10px] text-theme-muted">Veloce e Furtivo</p>
+          <p class="text-[10px] text-amber-400 font-semibold">+20% Monete ≥24h prima</p>
         </div>
         <div onclick="selectClass('Bardo', '🎨')" class="glass-panel p-4 rounded-2xl cursor-pointer hover:border-indigo-500 text-center space-y-1 transition">
           <div class="text-4xl">🎨</div>
           <div class="font-bold text-sm">Bardo</div>
-          <p class="text-[10px] text-theme-muted">Creativo & Intelligente</p>
+          <p class="text-[10px] text-pink-400 font-semibold">-10% costo premi Shop</p>
         </div>
       </div>
     </div>
@@ -674,6 +876,29 @@
 
   <!-- JAVASCRIPT LOGIC -->
   <script>
+    const CLASS_PASSIVES = {
+      Mago: {
+        short: '+15% XP Difficile',
+        desc: '+15% XP sulle quest di difficoltà Difficile',
+        icon: '🧙‍♂️'
+      },
+      Canaglia: {
+        short: '+20% Monete (≥24h)',
+        desc: '+20% Monete se completi almeno 24h prima della scadenza',
+        icon: '🗡️'
+      },
+      Guerriero: {
+        short: 'Scudo Streak 1x/sett',
+        desc: 'Protezione Streak: salva la streak 1 volta a settimana se salti un giorno',
+        icon: '⚔️'
+      },
+      Bardo: {
+        short: '-10% Sconto Shop',
+        desc: 'Sconto del 10% su tutti i premi nello Shop',
+        icon: '🎨'
+      }
+    };
+
     const DEFAULT_STATE = {
       player: {
         name: "Studente Eroe",
@@ -684,6 +909,7 @@
         gold: 50,
         streak: 1,
         lastCompletedDate: null,
+        streakShieldUsedWeek: null,
         className: "Mago",
         avatar: "🧙‍♂️",
         avatarBg: "from-indigo-500 via-purple-500 to-pink-500"
@@ -712,6 +938,12 @@
           difficulty: 'MEDIUM',
           dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
           notes: 'Pagina 124, esercizi 12, 14, 15',
+          isBoss: false,
+          subtasks: [
+            { id: 'st-1', text: 'Ripasso regole MCD e mcm', done: true },
+            { id: 'st-2', text: 'Esercizi 12 e 14', done: false },
+            { id: 'st-3', text: 'Esercizio 15 e verifica finale', done: false }
+          ],
           completed: false
         }
       ],
@@ -724,12 +956,93 @@
         { id: 't-1', name: 'Primo Passo', desc: 'Completa la tua prima Quest', icon: '🌱', unlocked: false },
         { id: 't-2', name: 'Inarrestabile', desc: 'Raggiungi 5 giorni di Streak', icon: '🔥', unlocked: false },
         { id: 't-3', name: 'Riccone', desc: 'Accumula 500 Monete d\'Oro', icon: '💰', unlocked: false },
-        { id: 't-4', name: 'Maestro dello Studio', desc: 'Raggiungi il Livello 5', icon: '👑', unlocked: false }
+        { id: 't-4', name: 'Maestro dello Studio', desc: 'Raggiungi il Livello 5', icon: '👑', unlocked: false },
+        { id: 't-5', name: 'Ammazzadraghi', desc: 'Sconfiggi la tua prima Boss Fight', icon: '🐉', unlocked: false }
       ],
       theme: 'dark-fantasy'
     };
 
-    let state = JSON.parse(localStorage.getItem('questlog_state')) || DEFAULT_STATE;
+    // Caricamento e migrazione sicura retrocompatibile
+    function loadAndMigrateState() {
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem('questlog_state'));
+      } catch (e) {
+        saved = null;
+      }
+      if (!saved || !saved.player) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+
+      saved.player = { ...DEFAULT_STATE.player, ...saved.player };
+      saved.settings = { ...DEFAULT_STATE.settings, ...(saved.settings || {}) };
+      saved.subjects = Array.isArray(saved.subjects) && saved.subjects.length > 0 ? saved.subjects : DEFAULT_STATE.subjects;
+      saved.quests = Array.isArray(saved.quests) ? saved.quests.map(q => ({
+        isBoss: false,
+        subtasks: [],
+        ...q
+      })) : [];
+      saved.rewards = Array.isArray(saved.rewards) ? saved.rewards : DEFAULT_STATE.rewards;
+      saved.trophies = Array.isArray(saved.trophies) ? saved.trophies : DEFAULT_STATE.trophies;
+
+      // Aggiunge il trofeo Boss se mancante nei vecchi salvataggi
+      if (!saved.trophies.some(t => t.id === 't-5')) {
+        saved.trophies.push({ id: 't-5', name: 'Ammazzadraghi', desc: 'Sconfiggi la tua prima Boss Fight', icon: '🐉', unlocked: false });
+      }
+      return saved;
+    }
+
+    let state = loadAndMigrateState();
+    let draftSubtasks = [];
+    let monthlyChartMode = '30days';
+
+    // UI Notification Toast (Sostituisce alert())
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const styles = {
+        success: 'border-emerald-500/60 bg-slate-900/95 text-emerald-300',
+        levelup: 'border-amber-400 bg-slate-900/95 text-amber-300',
+        boss: 'border-rose-500 bg-slate-900/95 text-rose-300',
+        warning: 'border-amber-500/60 bg-slate-900/95 text-amber-200',
+        info: 'border-indigo-500/60 bg-slate-900/95 text-slate-100'
+      };
+      toast.className = `pointer-events-auto glass-panel px-4 py-3 rounded-2xl border shadow-2xl text-xs font-bold flex items-center justify-between gap-3 transition-all duration-300 transform translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3600);
+    }
+
+    // Custom Confirm Dialog (Sostituisce confirm())
+    function showConfirmDialog(title, message, onConfirm) {
+      const modal = document.getElementById('modal-confirm');
+      document.getElementById('confirm-title').innerText = title;
+      document.getElementById('confirm-message').innerText = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const cancelBtn = document.getElementById('confirm-cancel-btn');
+      const okBtn = document.getElementById('confirm-ok-btn');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        cancelBtn.onclick = null;
+        okBtn.onclick = null;
+      };
+
+      cancelBtn.onclick = cleanup;
+      okBtn.onclick = () => {
+        cleanup();
+        onConfirm();
+      };
+    }
 
     function playAudioFx(type) {
       try {
@@ -747,6 +1060,14 @@
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
           osc.start();
           osc.stop(ctx.currentTime + 0.3);
+        } else if (type === 'hit') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(190, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(75, ctx.currentTime + 0.16);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.16);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.16);
         } else if (type === 'levelup') {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(300, ctx.currentTime);
@@ -772,13 +1093,13 @@
     resizeCanvas();
 
     function triggerConfetti() {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 55; i++) {
         particles.push({
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
           vx: (Math.random() - 0.5) * 12,
           vy: (Math.random() - 0.7) * 14,
-          color: ['#6366f1', '#f59e0b', '#10b981', '#ec4899'][Math.floor(Math.random() * 4)],
+          color: ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#f43f5e'][Math.floor(Math.random() * 5)],
           size: Math.random() * 6 + 4,
           life: 100
         });
@@ -799,6 +1120,70 @@
       requestAnimationFrame(animateParticles);
     }
     animateParticles();
+
+    // Calcola identificatore settimana ISO (es. "2026-W47") per lo Scudo del Guerriero
+    function getWeekIdentifier(dateObj = new Date()) {
+      const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return `${d.getUTCFullYear()}-W${weekNo}`;
+    }
+
+    function isWarriorShieldAvailable() {
+      if (state.player.className !== 'Guerriero') return false;
+      const currentWeek = getWeekIdentifier(new Date());
+      return state.player.streakShieldUsedWeek !== currentWeek;
+    }
+
+    // Calcolo ricompense reali della Quest tenendo conto di Boss Fight e Passive di Classe
+    function calculateQuestRewards(quest) {
+      let baseXP = state.settings.xpMedium;
+      let baseGold = state.settings.goldMedium;
+
+      if (quest.difficulty === 'EASY') {
+        baseXP = state.settings.xpEasy;
+        baseGold = state.settings.goldEasy;
+      } else if (quest.difficulty === 'HARD') {
+        baseXP = state.settings.xpHard;
+        baseGold = state.settings.goldHard;
+      }
+
+      // Boss Fight: Loot 2X!
+      if (quest.isBoss) {
+        baseXP *= 2;
+        baseGold *= 2;
+      }
+
+      let bonusNotes = [];
+
+      // Passiva Mago: +15% XP su quest Difficili
+      if (state.player.className === 'Mago' && quest.difficulty === 'HARD') {
+        baseXP = Math.round(baseXP * 1.15);
+        bonusNotes.push('🧙‍♂️ +15% XP');
+      }
+
+      // Passiva Canaglia: +20% Monete se completata almeno 24h prima della scadenza
+      let rogueEligible = false;
+      if (state.player.className === 'Canaglia' && quest.dueDate) {
+        const dueDateTime = new Date(`${quest.dueDate}T${quest.dueTime || '23:59:59'}`);
+        const refTime = quest.completed && quest.completedAt ? new Date(quest.completedAt) : new Date();
+        const hoursLeft = (dueDateTime - refTime) / (1000 * 60 * 60);
+        if (hoursLeft >= 24) {
+          rogueEligible = true;
+          baseGold = Math.round(baseGold * 1.20);
+          bonusNotes.push('🗡️ +20% G');
+        }
+      }
+
+      return {
+        xp: baseXP,
+        gold: baseGold,
+        bonusNotes,
+        rogueEligible
+      };
+    }
 
     function renderHeader() {
       document.documentElement.setAttribute('data-theme', state.theme || 'dark-fantasy');
@@ -821,7 +1206,33 @@
       avatarEl.innerText = state.player.avatar || "🧙‍♂️";
       avatarEl.className = `w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br ${state.player.avatarBg || 'from-indigo-500 via-purple-500 to-pink-500'} flex items-center justify-center text-4xl text-white shadow-xl transform group-hover:scale-105 transition`;
 
-      document.getElementById('char-class-badge').innerText = state.player.className || "Mago";
+      const activeClass = state.player.className || "Mago";
+      document.getElementById('char-class-badge').innerText = activeClass;
+
+      const passiveInfo = CLASS_PASSIVES[activeClass] || CLASS_PASSIVES.Mago;
+      document.getElementById('char-passive-short').innerText = passiveInfo.short;
+
+      // Indicatore scudo Guerriero nella dashboard Streak
+      const shieldBadge = document.getElementById('warrior-shield-badge');
+      if (activeClass === 'Guerriero') {
+        shieldBadge.classList.remove('hidden');
+        if (isWarriorShieldAvailable()) {
+          shieldBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 border border-sky-500/40';
+          shieldBadge.title = 'Scudo Guerriero PRONTO: protegge la streak se salti un giorno questa settimana';
+        } else {
+          shieldBadge.className = 'text-[9px] px-1.5 py-0.2 rounded bg-slate-700/60 text-slate-400 border border-slate-600';
+          shieldBadge.title = 'Scudo Guerriero già utilizzato questa settimana (si ricarica lunedì)';
+        }
+      } else {
+        shieldBadge.classList.add('hidden');
+      }
+
+      // Badge Bardo nello Shop
+      const bardShopBadge = document.getElementById('shop-bard-badge');
+      if (bardShopBadge) {
+        if (activeClass === 'Bardo') bardShopBadge.classList.remove('hidden');
+        else bardShopBadge.classList.add('hidden');
+      }
     }
 
     function openProfileCustomizer() {
@@ -830,12 +1241,27 @@
       document.getElementById('custom-title').value = state.player.title || '';
       document.getElementById('custom-motto').value = state.player.motto || '';
       document.getElementById('custom-avatar-bg').value = state.player.avatarBg || 'from-indigo-500 via-purple-500 to-pink-500';
+      const currentClass = state.player.className || 'Mago';
+      document.getElementById('custom-class-name').value = currentClass;
+      highlightSelectedClassCard(currentClass);
       openModal('modal-profile');
     }
 
+    function highlightSelectedClassCard(className) {
+      document.querySelectorAll('.class-preset-btn').forEach(btn => {
+        btn.classList.remove('border-indigo-500', 'bg-indigo-500/15', 'ring-2', 'ring-indigo-500/40');
+      });
+      const activeCard = document.getElementById(`class-card-${className}`);
+      if (activeCard) {
+        activeCard.classList.add('border-indigo-500', 'bg-indigo-500/15', 'ring-2', 'ring-indigo-500/40');
+      }
+    }
+
     function selectClassPreset(className, avatar) {
+      document.getElementById('custom-class-name').value = className;
       document.getElementById('custom-avatar').value = avatar;
       document.getElementById('custom-title').value = `Mastro ${className}`;
+      highlightSelectedClassCard(className);
     }
 
     function saveProfileCustomization() {
@@ -844,15 +1270,20 @@
       const title = document.getElementById('custom-title').value.trim() || 'Studioso Leggendario';
       const motto = document.getElementById('custom-motto').value.trim();
       const avatarBg = document.getElementById('custom-avatar-bg').value;
+      const className = document.getElementById('custom-class-name').value || state.player.className || 'Mago';
 
       if (name) state.player.name = name;
       state.player.avatar = avatar;
       state.player.title = title;
       state.player.motto = motto;
       state.player.avatarBg = avatarBg;
+      state.player.className = className;
 
       saveState();
+      renderQuests();
+      renderShop();
       closeModal('modal-profile');
+      showToast(`Profilo aggiornato! Classe attiva: ${className} (${CLASS_PASSIVES[className].short})`, 'success');
     }
 
     function addXPAndGold(xpAmount, goldAmount) {
@@ -865,7 +1296,7 @@
         state.player.level += 1;
         playAudioFx('levelup');
         triggerConfetti();
-        alert(`🎉 LEVEL UP! Hai raggiunto il Livello ${state.player.level}!`);
+        showToast(`🎉 LEVEL UP! Hai raggiunto il Livello ${state.player.level}!`, 'levelup');
       }
       saveState();
     }
@@ -895,6 +1326,120 @@
       }
     }
 
+    // Gestione Modal Nuova Quest & Subtasks Draft
+    function openNewQuestModal(asBoss = false) {
+      document.getElementById('quest-title').value = '';
+      document.getElementById('quest-notes').value = '';
+      document.getElementById('quest-date').value = '';
+      document.getElementById('quest-time').value = '';
+      document.getElementById('new-subtask-input').value = '';
+      draftSubtasks = [];
+
+      const bossCheckbox = document.getElementById('quest-is-boss');
+      bossCheckbox.checked = asBoss;
+      toggleBossModalUI();
+      renderDraftSubtasks();
+      openModal('modal-quest');
+    }
+
+    function toggleBossModalUI() {
+      const isBoss = document.getElementById('quest-is-boss').checked;
+      const heading = document.getElementById('modal-quest-heading');
+      const titleLabel = document.getElementById('quest-title-label');
+      const titleInput = document.getElementById('quest-title');
+      const dateLabel = document.getElementById('quest-date-label');
+      const saveBtn = document.getElementById('btn-save-quest');
+      const suggestBtn = document.getElementById('btn-suggest-boss-steps');
+
+      if (isBoss) {
+        heading.innerHTML = `<i class="fa-solid fa-dragon text-rose-500"></i> Evoca Boss Fight (Esame / Verifica)`;
+        titleLabel.innerText = 'Nome Boss (Es. Verifica di Storia, Esame Analisi)';
+        titleInput.placeholder = 'Es. Verifica Scritta di Matematica - Derivate';
+        dateLabel.innerText = 'Data Battaglia (Giorno Esame)';
+        saveBtn.innerText = 'Evoca Boss (Loot 2X)';
+        saveBtn.className = 'flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-lg';
+        suggestBtn.classList.remove('hidden');
+      } else {
+        heading.innerHTML = `<i class="fa-solid fa-scroll text-emerald-400"></i> Nuova Quest`;
+        titleLabel.innerText = 'Titolo Compito / Quest';
+        titleInput.placeholder = 'Es. Espressioni di Matematica, Pagina 45';
+        dateLabel.innerText = 'Data Scadenza';
+        saveBtn.innerText = 'Crea Quest';
+        saveBtn.className = 'flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-lg';
+        suggestBtn.classList.add('hidden');
+      }
+    }
+
+    function addSuggestedBossSubtasks() {
+      const presets = ['Ripasso teoria e appunti', 'Schemi e mappe concettuali', 'Esercizi di prova / simulazione', 'Ripasso generale pre-verifica'];
+      presets.forEach((text, i) => {
+        if (!draftSubtasks.some(s => s.text === text)) {
+          draftSubtasks.push({ id: 'st-' + Date.now() + '-' + i, text, done: false });
+        }
+      });
+      renderDraftSubtasks();
+    }
+
+    function addDraftSubtask() {
+      const input = document.getElementById('new-subtask-input');
+      const text = input.value.trim();
+      if (!text) return;
+      draftSubtasks.push({
+        id: 'st-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        text,
+        done: false
+      });
+      input.value = '';
+      renderDraftSubtasks();
+    }
+
+    function removeDraftSubtask(index) {
+      draftSubtasks.splice(index, 1);
+      renderDraftSubtasks();
+    }
+
+    function renderDraftSubtasks() {
+      const list = document.getElementById('draft-subtasks-list');
+      if (draftSubtasks.length === 0) {
+        list.innerHTML = `<p class="text-[11px] text-theme-muted italic">Nessun passaggio aggiunto (opzionale).</p>`;
+        return;
+      }
+      list.innerHTML = draftSubtasks.map((st, idx) => `
+        <div class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl glass-panel border border-theme-border text-xs">
+          <span class="truncate"><i class="fa-regular fa-square text-indigo-400 mr-1.5"></i>${st.text}</span>
+          <button type="button" onclick="removeDraftSubtask(${idx})" class="text-rose-400 hover:text-rose-300 text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Spunta diretta di una Sub-Quest / Attacco al Boss dalla card
+    function toggleSubtask(questId, subtaskId) {
+      const quest = state.quests.find(q => q.id === questId);
+      if (!quest || !Array.isArray(quest.subtasks)) return;
+
+      const sub = quest.subtasks.find(s => s.id === subtaskId);
+      if (!sub) return;
+
+      sub.done = !sub.done;
+
+      if (quest.isBoss && sub.done && !quest.completed) {
+        playAudioFx('hit');
+        const total = quest.subtasks.length;
+        const doneCount = quest.subtasks.filter(s => s.done).length;
+        const hpLeft = Math.max(0, Math.round(((total - doneCount) / total) * 100));
+        if (hpLeft > 0) {
+          showToast(`⚔️ Colpo critico al Boss! HP rimasti: ${hpLeft}%`, 'boss');
+        } else {
+          showToast(`💀 HP del Boss a 0! Clicca "Sconfiggi Boss" per riscattare il Loot 2X!`, 'boss');
+        }
+      }
+
+      saveState();
+      renderQuests();
+    }
+
     function renderQuests() {
       const container = document.getElementById('quest-container');
       const subjectFilter = document.getElementById('filter-subject').value;
@@ -907,6 +1452,7 @@
         const dueInfo = getDueDateStatus(q.dueDate, q.dueTime);
         if (subjectFilter !== 'ALL' && q.subjectId !== subjectFilter) return false;
         if (statusFilter === 'ACTIVE' && q.completed) return false;
+        if (statusFilter === 'BOSS' && (!q.isBoss || q.completed)) return false;
         if (statusFilter === 'COMPLETED' && !q.completed) return false;
         if (statusFilter === 'EXPIRED' && (!dueInfo.isExpired || q.completed)) return false;
         return true;
@@ -938,20 +1484,11 @@
       filtered.forEach(q => {
         const subject = state.subjects.find(s => s.id === q.subjectId) || { name: 'Generale', color: '#6366f1' };
         const dueInfo = getDueDateStatus(q.dueDate, q.dueTime);
-        
-        let rewardXP = state.settings.xpMedium;
-        let rewardGold = state.settings.goldMedium;
-        let diffBadge = '🟡 Media';
+        const rewards = calculateQuestRewards(q);
 
-        if (q.difficulty === 'EASY') {
-          rewardXP = state.settings.xpEasy;
-          rewardGold = state.settings.goldEasy;
-          diffBadge = '🟢 Facile';
-        } else if (q.difficulty === 'HARD') {
-          rewardXP = state.settings.xpHard;
-          rewardGold = state.settings.goldHard;
-          diffBadge = '🔴 Difficile';
-        }
+        let diffBadge = '🟡 Media';
+        if (q.difficulty === 'EASY') diffBadge = '🟢 Facile';
+        else if (q.difficulty === 'HARD') diffBadge = '🔴 Difficile';
 
         let dueBadgeStyle = "bg-slate-700/50 text-theme-muted";
         if (!q.completed) {
@@ -959,36 +1496,108 @@
           else if (dueInfo.status === 'warning') dueBadgeStyle = "bg-amber-500/20 text-amber-400 border border-amber-500/40";
         }
 
+        const subtasks = Array.isArray(q.subtasks) ? q.subtasks : [];
+        const totalSubs = subtasks.length;
+        const doneSubs = subtasks.filter(s => s.done).length;
+        const progressPct = totalSubs > 0 ? Math.round((doneSubs / totalSubs) * 100) : (q.completed ? 100 : 0);
+        const bossHpPct = q.completed ? 0 : (totalSubs > 0 ? Math.max(0, 100 - progressPct) : 100);
+
+        // Sezione Barra HP (Boss) o Barra Avanzamento (Sub-quest)
+        let progressSectionHTML = '';
+        if (q.isBoss) {
+          progressSectionHTML = `
+            <div class="p-3 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-1.5">
+              <div class="flex justify-between items-center text-[11px] font-extrabold">
+                <span class="text-rose-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-heart-pulse"></i> BOSS HP
+                </span>
+                <span class="text-rose-300">${bossHpPct} / 100 HP ${totalSubs > 0 ? `(${doneSubs}/${totalSubs} colpi)` : ''}</span>
+              </div>
+              <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-rose-500/40">
+                <div class="h-full bg-gradient-to-r from-red-600 via-rose-500 to-orange-500 rounded-full transition-all duration-500" style="width: ${bossHpPct}%"></div>
+              </div>
+            </div>
+          `;
+        } else if (totalSubs > 0) {
+          progressSectionHTML = `
+            <div class="space-y-1">
+              <div class="flex justify-between text-[11px] font-semibold text-theme-muted">
+                <span>Avanzamento Step</span>
+                <span>${doneSubs}/${totalSubs} (${progressPct}%)</span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-theme-border">
+                <div class="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-300" style="width: ${progressPct}%"></div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Lista interattiva delle Sub-Quest
+        let subtasksListHTML = '';
+        if (totalSubs > 0) {
+          subtasksListHTML = `
+            <div class="space-y-1.5 pt-1">
+              ${subtasks.map(st => `
+                <label class="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-xl bg-black/20 hover:bg-black/30 cursor-pointer transition select-none">
+                  <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleSubtask('${q.id}', '${st.id}')" class="w-3.5 h-3.5 rounded accent-emerald-500 cursor-pointer">
+                  <span class="${st.done ? 'line-through text-theme-muted' : 'text-theme-text'} flex-1">${st.text}</span>
+                  ${q.isBoss && !st.done ? '<span class="text-[10px] text-rose-400 font-bold">⚔️</span>' : ''}
+                </label>
+              `).join('')}
+            </div>
+          `;
+        }
+
         const card = document.createElement('div');
-        card.className = `glass-panel rounded-3xl p-5 border flex flex-col justify-between gap-4 transition transform hover:-translate-y-1 ${q.completed ? 'opacity-60 border-emerald-500/30' : dueInfo.isExpired ? 'border-rose-500/50' : 'border-theme-border'}`;
+        card.className = `${q.isBoss && !q.completed ? 'boss-card' : 'glass-panel'} rounded-3xl p-5 border flex flex-col justify-between gap-4 transition transform hover:-translate-y-1 ${q.completed ? 'opacity-60 border-emerald-500/30' : !q.isBoss && dueInfo.isExpired ? 'border-rose-500/50' : !q.isBoss ? 'border-theme-border' : ''}`;
+
+        const completeBtnLabel = q.completed
+          ? 'Riapri'
+          : (q.isBoss ? 'Sconfiggi Boss!' : 'Completa');
+
+        const completeBtnStyle = q.completed
+          ? 'bg-slate-700 text-white'
+          : (q.isBoss ? 'bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white');
 
         card.innerHTML = `
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-lg text-white" style="background-color: ${subject.color}">
-                ${subject.name}
-              </span>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-lg text-white" style="background-color: ${subject.color}">
+                  ${subject.name}
+                </span>
+                ${q.isBoss ? '<span class="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-600 text-white uppercase tracking-wider shadow"><i class="fa-solid fa-dragon"></i> BOSS 2X</span>' : ''}
+              </div>
               <span class="text-xs font-semibold text-theme-muted">${diffBadge}</span>
             </div>
 
             <h3 class="font-bold text-base ${q.completed ? 'line-through text-theme-muted' : ''}">${q.title}</h3>
             ${q.notes ? `<p class="text-xs text-theme-muted">${q.notes}</p>` : ''}
+
+            ${progressSectionHTML}
+            ${subtasksListHTML}
           </div>
 
           <div class="space-y-3">
+            ${rewards.bonusNotes.length > 0 && !q.completed ? `
+              <div class="flex flex-wrap gap-1">
+                ${rewards.bonusNotes.map(b => `<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${b}</span>`).join('')}
+              </div>
+            ` : ''}
+
             <div class="flex items-center justify-between text-xs border-t border-theme-border pt-3">
               <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold ${dueBadgeStyle}">
-                ${q.completed ? '✅ Completata' : dueInfo.label} ${q.dueTime && !q.completed ? `(${q.dueTime})` : ''}
+                ${q.completed ? (q.isBoss ? '🏆 Sconfitto' : '✅ Completata') : dueInfo.label} ${q.dueTime && !q.completed ? `(${q.dueTime})` : ''}
               </span>
               <div class="flex gap-2">
-                <span class="text-purple-400 font-bold">+${rewardXP} XP</span>
-                <span class="text-amber-400 font-bold">+${rewardGold} G</span>
+                <span class="text-purple-400 font-bold">+${rewards.xp} XP</span>
+                <span class="text-amber-400 font-bold">+${rewards.gold} G</span>
               </div>
             </div>
 
             <div class="flex gap-2">
-              <button onclick="toggleQuest('${q.id}')" class="flex-1 py-2 rounded-xl ${q.completed ? 'bg-slate-700 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'} font-bold text-xs shadow transition">
-                <i class="fa-solid ${q.completed ? 'fa-rotate-left' : 'fa-check-circle'}"></i> ${q.completed ? 'Riapri' : 'Completa'}
+              <button onclick="toggleQuest('${q.id}')" class="flex-1 py-2 rounded-xl ${completeBtnStyle} font-bold text-xs shadow transition">
+                <i class="fa-solid ${q.completed ? 'fa-rotate-left' : (q.isBoss ? 'fa-khanda' : 'fa-check-circle')}"></i> ${completeBtnLabel}
               </button>
               <button onclick="deleteQuest('${q.id}')" class="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 text-xs transition">
                 <i class="fa-solid fa-trash"></i>
@@ -1008,9 +1617,20 @@
       const dueDate = document.getElementById('quest-date').value;
       const dueTime = document.getElementById('quest-time').value;
       const notes = document.getElementById('quest-notes').value.trim();
+      const isBoss = document.getElementById('quest-is-boss').checked;
+
+      // Cattura eventuale testo lasciato nell'input sub-quest senza aver cliccato "+"
+      const pendingSub = document.getElementById('new-subtask-input').value.trim();
+      if (pendingSub) {
+        draftSubtasks.push({
+          id: 'st-' + Date.now(),
+          text: pendingSub,
+          done: false
+        });
+      }
 
       if (!title) {
-        alert("Inserisci un titolo per la Quest!");
+        showToast("Inserisci un titolo per la Quest!", "warning");
         return;
       }
 
@@ -1022,6 +1642,8 @@
         dueDate,
         dueTime,
         notes,
+        isBoss,
+        subtasks: [...draftSubtasks],
         completed: false,
         completedAt: null
       });
@@ -1029,11 +1651,13 @@
       saveState();
       renderQuests();
       closeModal('modal-quest');
+      showToast(isBoss ? `🐉 Boss "${title}" evocato! Sconfiggilo per Loot 2X!` : `📜 Quest "${title}" aggiunta al diario!`, isBoss ? 'boss' : 'success');
 
       document.getElementById('quest-title').value = '';
       document.getElementById('quest-notes').value = '';
       document.getElementById('quest-date').value = '';
       document.getElementById('quest-time').value = '';
+      draftSubtasks = [];
     }
 
     function toggleQuest(id) {
@@ -1044,22 +1668,24 @@
 
       if (quest.completed) {
         quest.completedAt = new Date().toISOString();
+        // Completa automaticamente eventuali sotto-obiettivi rimasti
+        if (Array.isArray(quest.subtasks)) {
+          quest.subtasks.forEach(s => s.done = true);
+        }
+
         playAudioFx('complete');
         triggerConfetti();
 
-        let xp = state.settings.xpMedium;
-        let gold = state.settings.goldMedium;
-
-        if (quest.difficulty === 'EASY') {
-          xp = state.settings.xpEasy;
-          gold = state.settings.goldEasy;
-        } else if (quest.difficulty === 'HARD') {
-          xp = state.settings.xpHard;
-          gold = state.settings.goldHard;
-        }
-
-        addXPAndGold(xp, gold);
+        const rewards = calculateQuestRewards(quest);
+        addXPAndGold(rewards.xp, rewards.gold);
         updateStreak();
+
+        const bonusText = rewards.bonusNotes.length > 0 ? ` (${rewards.bonusNotes.join(', ')})` : '';
+        if (quest.isBoss) {
+          showToast(`🏆 BOSS SCONFITTO! Loot 2X ottenuto: +${rewards.xp} XP e +${rewards.gold} Monete${bonusText}!`, 'boss');
+        } else {
+          showToast(`✅ Quest completata! +${rewards.xp} XP e +${rewards.gold} Monete${bonusText}!`, 'success');
+        }
       } else {
         quest.completedAt = null;
       }
@@ -1069,24 +1695,109 @@
     }
 
     function deleteQuest(id) {
-      if (confirm("Vuoi cancellare questa quest?")) {
+      showConfirmDialog("Elimina Quest", "Vuoi davvero cancellare questa quest dal diario?", () => {
         state.quests = state.quests.filter(q => q.id !== id);
         saveState();
         renderQuests();
-      }
+        showToast("Quest eliminata.", "info");
+      });
     }
 
+    // ==========================================
+    // ANALYTICS & STATISTICHE POTENZIATE
+    // ==========================================
     let activityChart = null;
     let subjectsChart = null;
+    let monthlyChart = null;
+
+    function setMonthlyChartMode(mode) {
+      monthlyChartMode = mode;
+      const btn30 = document.getElementById('btn-chart-30days');
+      const btn6m = document.getElementById('btn-chart-6months');
+      if (mode === '30days') {
+        btn30.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500 text-white transition';
+        btn6m.className = 'px-3 py-1.5 rounded-xl text-xs font-bold glass-panel text-theme-muted hover:text-theme-text transition';
+      } else {
+        btn6m.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-500 text-white transition';
+        btn30.className = 'px-3 py-1.5 rounded-xl text-xs font-bold glass-panel text-theme-muted hover:text-theme-text transition';
+      }
+      renderMonthlyChart();
+    }
+
+    function renderMonthlyChart() {
+      const completedQuests = state.quests.filter(q => q.completed);
+      const ctxMonthly = document.getElementById('chart-monthly').getContext('2d');
+      if (monthlyChart) monthlyChart.destroy();
+
+      let labels = [];
+      let counts = [];
+
+      if (monthlyChartMode === '30days') {
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().split('T')[0];
+          const labelStr = d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+          labels.push(labelStr);
+          const count = completedQuests.filter(q => q.completedAt && q.completedAt.startsWith(dateStr)).length;
+          counts.push(count);
+        }
+      } else {
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const monthName = d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
+          labels.push(monthName);
+          const count = completedQuests.filter(q => q.completedAt && q.completedAt.startsWith(yearMonth)).length;
+          counts.push(count);
+        }
+      }
+
+      monthlyChart = new Chart(ctxMonthly, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Quest Completate',
+            data: counts,
+            backgroundColor: '#10b981',
+            hoverBackgroundColor: '#34d399',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0, color: '#94a3b8' },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            x: {
+              ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 0, font: { size: 10 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
 
     function renderAnalytics() {
-      const completedQuests = state.quests.filter(q => q.completed);
+      const allQuests = state.quests;
+      const completedQuests = allQuests.filter(q => q.completed);
+
+      // KPI Esistenti
       document.getElementById('kpi-total-completed').innerText = completedQuests.length;
 
       const totalXP = state.player.xp + ((state.player.level - 1) * state.settings.xpLevelUpBase);
       document.getElementById('kpi-total-xp').innerText = totalXP;
 
-      const completedWithDueDate = completedQuests.filter(q => q.dueDate);
+      const completedWithDueDate = completedQuests.filter(q => q.dueDate && q.completedAt);
       if (completedWithDueDate.length > 0) {
         const onTimeCount = completedWithDueDate.filter(q => {
           const completedDate = new Date(q.completedAt);
@@ -1101,6 +1812,34 @@
 
       document.getElementById('kpi-max-streak').innerText = `${state.player.streak} gg`;
 
+      // Nuovi KPI Avanzati
+      const bossesDefeated = completedQuests.filter(q => q.isBoss).length;
+      document.getElementById('kpi-boss-defeated').innerText = bossesDefeated;
+
+      let totalSubtasksDone = 0;
+      allQuests.forEach(q => {
+        if (Array.isArray(q.subtasks)) {
+          totalSubtasksDone += q.subtasks.filter(s => s.done).length;
+        }
+      });
+      document.getElementById('kpi-subtasks-done').innerText = totalSubtasksDone;
+
+      const completionRate = allQuests.length > 0 ? Math.round((completedQuests.length / allQuests.length) * 100) : 0;
+      document.getElementById('kpi-completion-rate').innerText = `${completionRate}%`;
+
+      // Materia più studiata
+      let topSubName = '-';
+      let topSubCount = 0;
+      state.subjects.forEach(sub => {
+        const c = completedQuests.filter(q => q.subjectId === sub.id).length;
+        if (c > topSubCount) {
+          topSubCount = c;
+          topSubName = `${sub.name} (${c})`;
+        }
+      });
+      document.getElementById('kpi-top-subject').innerText = topSubName;
+
+      // Grafico 7 giorni (Esistente)
       const last7Days = [];
       const questCounts = [];
       for (let i = 6; i >= 0; i--) {
@@ -1108,9 +1847,7 @@
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
         const dayName = d.toLocaleDateString('it-IT', { weekday: 'short' });
-        
         last7Days.push(dayName);
-
         const count = completedQuests.filter(q => q.completedAt && q.completedAt.startsWith(dateStr)).length;
         questCounts.push(count);
       }
@@ -1133,12 +1870,13 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            y: { ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            x: { grid: { display: false } }
+            y: { ticks: { precision: 0, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
           }
         }
       });
 
+      // Grafico Ripartizione Materie (Esistente)
       const subjectNames = [];
       const subjectCounts = [];
       const subjectColors = [];
@@ -1172,6 +1910,60 @@
           }
         }
       });
+
+      // Grafico Mensile (Nuovo)
+      renderMonthlyChart();
+
+      // Analisi dettagliata per Difficoltà
+      const diffContainer = document.getElementById('analytics-difficulty-breakdown');
+      const diffs = [
+        { key: 'EASY', label: '🟢 Facile', barColor: 'bg-emerald-500' },
+        { key: 'MEDIUM', label: '🟡 Media', barColor: 'bg-amber-500' },
+        { key: 'HARD', label: '🔴 Difficile', barColor: 'bg-rose-500' }
+      ];
+
+      diffContainer.innerHTML = diffs.map(d => {
+        const totalD = allQuests.filter(q => q.difficulty === d.key).length;
+        const doneD = completedQuests.filter(q => q.difficulty === d.key).length;
+        const pct = totalD > 0 ? Math.round((doneD / totalD) * 100) : 0;
+        return `
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs font-bold">
+              <span>${d.label}</span>
+              <span class="text-theme-muted">${doneD} / ${totalD} completate (${pct}%)</span>
+            </div>
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-theme-border">
+              <div class="h-full ${d.barColor} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Rendimento Dettagliato per Materia
+      const subTable = document.getElementById('analytics-subject-table');
+      subTable.innerHTML = state.subjects.map(sub => {
+        const totalS = allQuests.filter(q => q.subjectId === sub.id).length;
+        const doneS = completedQuests.filter(q => q.subjectId === sub.id).length;
+        const bossesS = completedQuests.filter(q => q.subjectId === sub.id && q.isBoss).length;
+        const pctS = totalS > 0 ? Math.round((doneS / totalS) * 100) : 0;
+        return `
+          <div class="p-3 rounded-2xl glass-panel border border-theme-border flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-3.5 h-3.5 rounded-full shrink-0" style="background-color: ${sub.color}"></span>
+              <div class="truncate">
+                <p class="text-xs font-bold truncate">${sub.name}</p>
+                <p class="text-[10px] text-theme-muted">${doneS}/${totalS} Quest ${bossesS > 0 ? `• 🐉 ${bossesS} Boss` : ''}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-16 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full rounded-full" style="width: ${pctS}%; background-color: ${sub.color}"></div>
+              </div>
+              <span class="text-xs font-extrabold w-9 text-right">${pctS}%</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function switchTab(tabName) {
@@ -1181,7 +1973,7 @@
         
         const btn = document.getElementById(`tab-btn-${t}`);
         if (btn) {
-          btn.className = "nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border";
+          btn.className = "nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition text-theme-muted hover:bg-theme-border whitespace-nowrap";
         }
       });
 
@@ -1190,11 +1982,13 @@
 
       const activeBtn = document.getElementById(`tab-btn-${tabName}`);
       if (activeBtn) {
-        activeBtn.className = "nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition bg-theme-accent text-white shadow-lg shadow-indigo-500/20";
+        activeBtn.className = "nav-tab px-5 py-2.5 rounded-2xl font-bold text-sm flex items-center gap-2 transition bg-theme-accent text-white shadow-lg shadow-indigo-500/20 whitespace-nowrap";
       }
 
       if (tabName === 'analytics') {
         renderAnalytics();
+      } else if (tabName === 'shop') {
+        renderShop();
       }
     }
 
@@ -1213,10 +2007,17 @@
       if (state.player.lastCompletedDate === today) return;
 
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+
       if (state.player.lastCompletedDate === yesterday) {
         state.player.streak += 1;
       } else if (!state.player.lastCompletedDate) {
         state.player.streak = 1;
+      } else if (state.player.lastCompletedDate === twoDaysAgo && isWarriorShieldAvailable()) {
+        // Passiva Guerriero: salva la streak 1 volta a settimana se hai saltato esattamente 1 giorno!
+        state.player.streak += 1;
+        state.player.streakShieldUsedWeek = getWeekIdentifier(new Date());
+        showToast("⚔️ SCUDO DEL GUERRIERO ATTIVATO! La tua Streak è stata salvata!", "levelup");
       } else {
         state.player.streak = 1;
       }
@@ -1267,7 +2068,7 @@
       const color = document.getElementById('subject-color').value;
 
       if (!name) {
-        alert("Inserisci il nome della materia!");
+        showToast("Inserisci il nome della materia!", "warning");
         return;
       }
 
@@ -1287,15 +2088,23 @@
 
     function deleteSubject(id) {
       if (state.subjects.length <= 1) {
-        alert("Devi mantenere almeno una materia!");
+        showToast("Devi mantenere almeno una materia!", "warning");
         return;
       }
-      if (confirm("Vuoi eliminare questa materia?")) {
+      showConfirmDialog("Elimina Materia", "Vuoi eliminare questa materia?", () => {
         state.subjects = state.subjects.filter(s => s.id !== id);
         saveState();
         renderSubjects();
         renderQuests();
+      });
+    }
+
+    // Calcola il costo effettivo nello shop (con sconto 10% se classe Bardo)
+    function getEffectiveRewardCost(baseCost) {
+      if (state.player.className === 'Bardo') {
+        return Math.max(1, Math.floor(baseCost * 0.90));
       }
+      return baseCost;
     }
 
     function renderShop() {
@@ -1303,9 +2112,11 @@
       if (!container) return;
 
       container.innerHTML = '';
+      const isBard = state.player.className === 'Bardo';
 
       state.rewards.forEach(r => {
-        const canAfford = state.player.gold >= r.cost;
+        const finalCost = getEffectiveRewardCost(r.cost);
+        const canAfford = state.player.gold >= finalCost;
         const card = document.createElement('div');
         card.className = 'glass-panel p-5 rounded-3xl border border-theme-border flex flex-col justify-between gap-4';
         card.innerHTML = `
@@ -1315,8 +2126,11 @@
             </div>
             <div>
               <h3 class="font-bold text-sm">${r.title}</h3>
-              <p class="text-xs text-amber-400 font-extrabold flex items-center gap-1">
-                <i class="fa-solid fa-coins"></i> ${r.cost} Monete
+              <p class="text-xs text-amber-400 font-extrabold flex items-center gap-1.5">
+                <i class="fa-solid fa-coins"></i>
+                ${isBard && finalCost < r.cost
+                  ? `<span class="line-through text-theme-muted font-normal">${r.cost}</span> <span>${finalCost} Monete</span> <span class="text-[9px] px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-400">-10%</span>`
+                  : `${r.cost} Monete`}
               </p>
             </div>
           </div>
@@ -1340,7 +2154,7 @@
       const cost = parseInt(document.getElementById('reward-cost').value);
 
       if (!title || isNaN(cost) || cost <= 0) {
-        alert("Inserisci un titolo e un costo valido per il premio!");
+        showToast("Inserisci un titolo e un costo valido per il premio!", "warning");
         return;
       }
 
@@ -1363,32 +2177,35 @@
       const reward = state.rewards.find(r => r.id === id);
       if (!reward) return;
 
-      if (state.player.gold >= reward.cost) {
-        state.player.gold -= reward.cost;
+      const finalCost = getEffectiveRewardCost(reward.cost);
+      if (state.player.gold >= finalCost) {
+        state.player.gold -= finalCost;
         playAudioFx('complete');
         triggerConfetti();
-        alert(`🎉 Complimenti! Hai riscattato: ${reward.title}!`);
+        showToast(`🎉 Complimenti! Hai riscattato: ${reward.title} (-${finalCost} Monete)!`, 'success');
         saveState();
         renderShop();
       }
     }
 
     function deleteReward(id) {
-      if (confirm("Vuoi cancellare questo premio dallo shop?")) {
+      showConfirmDialog("Elimina Premio", "Vuoi cancellare questo premio dallo shop?", () => {
         state.rewards = state.rewards.filter(r => r.id !== id);
         saveState();
         renderShop();
-      }
+      });
     }
 
     function checkTrophies() {
       const completedCount = state.quests.filter(q => q.completed).length;
+      const bossDefeatedCount = state.quests.filter(q => q.completed && q.isBoss).length;
 
       state.trophies.forEach(t => {
         if (t.id === 't-1' && completedCount >= 1) t.unlocked = true;
         if (t.id === 't-2' && state.player.streak >= 5) t.unlocked = true;
         if (t.id === 't-3' && state.player.gold >= 500) t.unlocked = true;
         if (t.id === 't-4' && state.player.level >= 5) t.unlocked = true;
+        if (t.id === 't-5' && bossDefeatedCount >= 1) t.unlocked = true;
       });
 
       renderTrophies();
@@ -1433,7 +2250,6 @@
       }
     }
 
-    function openNewQuestModal() { openModal('modal-quest'); }
     function openClassSelector() { openModal('modal-class'); }
     function openNewSubjectModal() { openModal('modal-subject'); }
     function openNewRewardModal() { openModal('modal-reward'); }
@@ -1442,6 +2258,8 @@
       state.player.className = name;
       state.player.avatar = avatar;
       saveState();
+      renderQuests();
+      renderShop();
       closeModal('modal-class');
     }
 
@@ -1466,7 +2284,7 @@
 
       saveState();
       renderQuests();
-      alert("Impostazioni salvate con successo!");
+      showToast("Impostazioni di bilanciamento salvate!", "success");
     }
 
     function exportData() {
@@ -1488,27 +2306,29 @@
         try {
           const importedState = JSON.parse(e.target.result);
           if (importedState && importedState.player) {
-            state = importedState;
+            localStorage.setItem('questlog_state', JSON.stringify(importedState));
+            state = loadAndMigrateState();
             saveState();
             initApp();
-            alert("Dati importati correttamente!");
+            showToast("Dati importati correttamente!", "success");
           } else {
-            alert("File JSON non valido.");
+            showToast("File JSON non valido.", "warning");
           }
         } catch (err) {
-          alert("Errore nella lettura del file JSON.");
+          showToast("Errore nella lettura del file JSON.", "warning");
         }
       };
       reader.readAsText(file);
     }
 
     function resetAllData() {
-      if (confirm("Sei sicuro di voler resettare tutti i dati? Questa azione non può essere annullata.")) {
+      showConfirmDialog("Reset Totale", "Sei sicuro di voler resettare tutti i dati? Questa azione non può essere annullata.", () => {
         localStorage.removeItem('questlog_state');
         state = JSON.parse(JSON.stringify(DEFAULT_STATE));
         saveState();
         initApp();
-      }
+        showToast("Dati resettati ai valori iniziali.", "info");
+      });
     }
 
     function initApp() {
